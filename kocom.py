@@ -24,7 +24,7 @@ import configparser
 
 
 # define -------------------------------
-SW_VERSION = '2024.11.24'
+SW_VERSION = '2024.12.01'
 CONFIG_FILE = 'kocom.conf'
 BUF_SIZE = 100
 
@@ -498,6 +498,36 @@ def mqtt_on_message(mqttc, obj, msg):
         value = onoff + speed + '0'*10
         send_wait_response(dest=dev_id, value=value, log='fan')
 
+    # kocom/myhome/alllights_on/command
+    elif 'alllights_on' in topic_d:
+        if command == 'PRESS':
+            send_lock.acquire()
+            send_data = 'aa55309c000eff010066ffffffffffffffff380d0d'
+            try:
+                if rs485.write(bytearray.fromhex(send_data)) == False:
+                    raise Exception('Not ready')
+                logging.info('[SEND|{}] {}'.format('all lights on', send_data))
+            except Exception as ex:
+                logging.error("[RS485] Write error.[{}]".format(ex) )
+                logging.info('[RS485] send failed. closing RS485. it will try to reconnect to RS485 shortly.')
+                rs485.close()
+            send_lock.release()
+
+    # kocom/myhome/alllights_off/command
+    elif 'alllights_off' in topic_d:
+        if command == 'PRESS':
+            send_lock.acquire()
+            send_data = 'aa55309c000eff01006500000000000000003f0d0d'
+            try:
+                if rs485.write(bytearray.fromhex(send_data)) == False:
+                    raise Exception('Not ready')
+                logging.info('[SEND|{}] {}'.format('all lights off', send_data))
+            except Exception as ex:
+                logging.error("[RS485] Write error.[{}]".format(ex) )
+                logging.info('[RS485] send failed. closing RS485. it will try to reconnect to RS485 shortly.')
+                rs485.close()
+            send_lock.release()
+
     # kocom/myhome/query/command
     elif 'query' in topic_d:
         if command == 'PRESS':
@@ -694,6 +724,25 @@ def publish_discovery(dev, sub=''):
             }
         }
         logtxt='[MQTT Discovery|{}{}] data[{}]'.format(dev, num, topic)
+        mqttc.publish(topic, json.dumps(payload))
+        if logtxt != "" and config.get('Log', 'show_mqtt_publish') == 'True':
+            logging.info(logtxt)
+    elif dev == 'alllights':
+        topic = 'homeassistant/button/kocom_wallpad_alllights_{}/config'.format(sub)
+        payload = {
+            'name': 'Kocom Wallpad All Lights {}'.format(sub.capitalize()),
+            'cmd_t': 'kocom/myhome/alllights_{}/command'.format(sub),
+            'qos': 0,
+            'uniq_id': '{}_{}_{}_{}'.format('kocom', 'wallpad', dev, sub),
+            'device': {
+                'name': '강동중흥 월패드',
+                'ids': 'kocom_smart_wallpad',
+                'mf': 'KOCOM',
+                'mdl': '스마트 월패드',
+                'sw': SW_VERSION
+            }
+        }
+        logtxt='[MQTT Discovery|{}_{}] data[{}]'.format(dev, sub, topic)
         mqttc.publish(topic, json.dumps(payload))
         if logtxt != "" and config.get('Log', 'show_mqtt_publish') == 'True':
             logging.info(logtxt)
