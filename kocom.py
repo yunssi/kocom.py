@@ -24,7 +24,7 @@ import configparser
 
 
 # define -------------------------------
-SW_VERSION = '2025.02.03'
+SW_VERSION = '2025.04.29'
 CONFIG_FILE = 'kocom.conf'
 BUF_SIZE = 100
 
@@ -798,7 +798,6 @@ def poll_state(enforce=False):
                 break
             time.sleep(1)
 
-    poll_timer.cancel()
     poll_timer = threading.Timer(polling_interval, poll_state)
     poll_timer.start()
 
@@ -810,7 +809,10 @@ def read_serial():
     while True:
         try:
             d = rs485.read()
-            hex_d = '{0:02x}'.format(ord(d))
+            if isinstance(d, bytes):
+                hex_d = '{0:02x}'.format(d[0])
+            else:
+                hex_d = '{0:02x}'.format(ord(d))
 
             buf += hex_d
             if buf[:len(header_h)] != header_h[:len(buf)]:
